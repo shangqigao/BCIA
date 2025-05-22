@@ -152,7 +152,8 @@ import numpy as np
 import torch
 import SimpleITK as sitk
 # === PanCIA IMPORTS ===
-from PanCIA.analysis.tumor_segmentation.m_tumor_segmentation import extract_BiomedParse_segmentation
+from CIA.analysis.tumor_segmentation.m_tumor_segmentation import extract_BiomedParse_segmentation
+from CIA.analysis.tumor_segmentation.m_tumor_segmentation import load_beta_params
 
 class Model:
     def __init__(self, dataset):
@@ -165,10 +166,9 @@ class Model:
         # MANDATOR
         self.dataset = dataset  # Restricted Access to Private Dataset
         self.predicted_segmentations = None  # Optional: stores path to predicted segmentations
-        # Only if using nnUNetv2, you can define here any other variables
-        self.dataset_id = "105"  # Dataset ID must match your folder structure
-        self.config = "3d_fullres" # nnUNetv2 configuration
-        
+        self.modality = "MRI"
+        self.site = "breast"
+        self.target = "tumor"
 
     def predict_segmentation(self, output_dir):
         """
@@ -181,57 +181,26 @@ class Model:
         Returns:
             str: Path to folder with predicted segmentation masks.
         """
-
-        # === Set required nnUNet paths ===
-        # Not strictly mandatory if pre-set in Docker env, but avoids missing variable warnings
-        os.environ['nnUNet_raw'] = "/app/ingested_program/sample_code_submission"
-        os.environ['nnUNet_preprocessed'] = "/app/ingested_program/sample_code_submission"
-        os.environ['nnUNet_results'] = "/app/ingested_program/sample_code_submission"
-
-        # Usage: https://github.com/MIC-DKFZ/nnUNet/tree/master/nnunetv2/inference
-        # === Instantiate nnUNet Predictor ===
-        predictor = nnUNetPredictor(
-            tile_step_size=0.5,
-            use_gaussian=True,
-            use_mirroring=True,
-            perform_everything_on_device=True,
-            device=torch.device('cuda'),
-            verbose=False,
-            verbose_preprocessing=False,
-            allow_tqdm=True
-        )
-        # === Load your trained model from a specific fold ===
-        predictor.initialize_from_trained_model_folder(
-            '/app/ingested_program/sample_code_submission/Dataset105_full_image/nnUNetTrainer__nnUNetPlans__3d_fullres',
-            use_folds=(0,), checkpoint_name='checkpoint_final.pth')
-        
-        # === Build nnUNet-compatible input images folder ===
-        nnunet_input_images = os.path.join(output_dir, 'nnunet_input_images')
-        os.makedirs(nnunet_input_images, exist_ok=True)
-
         # === Participants can modify how they prepare input ===
         patient_ids = self.dataset.get_patient_id_list()
+        multiphase_images = []
         for patient_id in patient_ids:
             images = self.dataset.get_dce_mri_path_list(patient_id)
-            # Select the image or images to be used to predict the final segmentation
-            # For example, using only the first post-contrast image
-            first_post_contrast_image = images[1]
-            # Save the image in the nnUNet format (ending in _0000.nii.gz)
-            nnunet_image_path = os.path.join(nnunet_input_images, f"{patient_id}_0001_0000.nii.gz")
-            # Copy and rename the image to the nnUNet format
-            shutil.copy(first_post_contrast_image, nnunet_image_path)
-
+            multiphase_images.append(images[:3])
+        text_prompts = [f"{self.site} {self.target}"]*len(multiphase_images)
+        beta_params = load_beta_params(self.modality, self.site, self.target)
         # === Output folder for raw nnUNet segmentations ===
-        output_dir_nnunet = os.path.join(output_dir, 'nnunet_seg')
-        os.makedirs(output_dir_nnunet, exist_ok=True)
+        output_dir_cia = os.path.join(output_dir, 'cia_seg')
+        os.makedirs(output_dir_cia, exist_ok=True)
 
-        # === Call nnUNetv2 prediction ===
-        nnunet_images = [[os.path.join(nnunet_input_images, f)] for f in os.listdir(nnunet_input_images)]
-        # IMPORTANT: the only method that works inside the Docker container is predict_from_files_sequential
-        # This method will predict all images in the list and save them in the output directory
-        ret = predictor.predict_from_files_sequential(nnunet_images, output_dir_nnunet, save_probabilities=False,
-                                                       overwrite=True, folder_with_segs_from_prev_stage=None)
-        print("Predictions saved to:", os.listdir(output_dir_nnunet))
+        extract_BiomedParse_segmentation(
+            img_paths=multiphase_images,
+            text_prompts=["breast tumor"]*len(multiphase_images),
+            save_dir=output_dir_cia,
+            is_CT=self.modality == 'CT',
+            site=self.site,
+            beta_params=beta_params
+        )
         
        # === Final output folder (MANDATORY name) ===
         output_dir_final = os.path.join(output_dir, 'pred_segmentations')
@@ -242,7 +211,7 @@ class Model:
         # Here, we iterate through the predicted segmentations and apply the breast mask to each segmentation
         # to remove false positives outside the breast region
         for patient_id in self.dataset.get_patient_id_list():
-            seg_path = os.path.join(output_dir_nnunet, f"{patient_id}_0001.nii.gz")
+            seg_path = os.path.join(output_dir_cia, f"{patient_id}.nii.gz")
             if not os.path.exists(seg_path):
                 print(f'{seg_path} NOT FOUND!')
                 continue

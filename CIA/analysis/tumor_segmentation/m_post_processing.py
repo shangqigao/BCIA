@@ -1,6 +1,3 @@
-import sys
-sys.path.append('./')
-
 import argparse
 import pathlib
 import nibabel as nib
@@ -89,44 +86,3 @@ def remove_inconsistent_objects(mask_3d, min_slices=3, min_dice=0.2,
 
     print(f"Removed {num_objects} of {num} objects with statistical significant difference!")
     return cleaned
-
-if __name__ == "__main__":
-    ## argument parser
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--nifti_dir', default="/Users/sg2162/Library/CloudStorage/OneDrive-UniversityofCambridge/Documents/CancerDatasets/sanity-check/predictions")
-    parser.add_argument('--save_dir', default="/Users/sg2162/Library/CloudStorage/OneDrive-UniversityofCambridge/Documents/CancerDatasets/sanity-check/post-processed", type=str)
-    args = parser.parse_args()
-
-    # args.nifti_dir = "/Users/sg2162/Library/CloudStorage/OneDrive-UniversityofCambridge/Documents/CancerDatasets/MAMA-MIA/segmentations/expert"
-    pathlib.Path(args.save_dir).mkdir(parents=True, exist_ok=True)
-    nifti_files = pathlib.Path(args.nifti_dir).glob("*.nii.gz")
-    nifti_files = list(nifti_files)
-    tumor_sizes = []
-    new_spacing = (1.0, 1.0, 1.0)
-    for i, nifti in enumerate(nifti_files):
-        nii_name = nifti.name
-        print(f"Processing [{i+1}/{len(nifti_files)}]")
-        nii = nib.load(nifti)
-        affine = nii.affine
-        phase, slice_axis, pixel_spacing = get_orientation(affine)
-        zoom_factors = tuple(os/ns for os, ns in zip(pixel_spacing, new_spacing))
-        nii_img = nii.get_fdata()
-        original_shape = nii_img.shape
-        # resample to (1, 1, 1)
-        nii_img = zoom(nii_img, zoom=zoom_factors, order=0)
-        new_shape = nii_img.shape
-        nii_img = np.moveaxis(nii_img, slice_axis, 0)
-        tsize = (np.sum(nii_img, axis=(1,2)) > 0).sum()
-        tumor_sizes.append(tsize)
-        processed_img = remove_inconsistent_objects(nii_img, min_slices=13)
-        processed_img = np.moveaxis(processed_img, 0, slice_axis)
-        zoom_factors = tuple(os/ns for os, ns in zip(original_shape, new_shape))
-        processed_img = zoom(processed_img, zoom=zoom_factors, order=0)
-        processed_img = nib.Nifti1Image(processed_img, affine)
-        save_path = f"{args.save_dir}/{nii_name}"
-        nib.save(processed_img, save_path)
-    tumor_sizes = np.array(tumor_sizes)
-    lowerbound = np.percentile(tumor_sizes, 1)
-    upperbound = np.percentile(tumor_sizes, 99)
-    print(f"Tumor size @1percentile={lowerbound}, @99percentile={upperbound}")
-    print(f"Minimal tumor size:", min(tumor_sizes))

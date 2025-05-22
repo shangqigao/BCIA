@@ -1,17 +1,13 @@
 import sys
 sys.path.append('./')
 
-import os
 import json
 import torch
-import logging
 import pathlib
 import argparse
 import numpy as np
 import nibabel as nib
 from PIL import Image
-from skimage.morphology import disk
-from scipy.ndimage import binary_dilation
 from modeling.BaseModel import BaseModel
 from modeling import build_model
 from utilities.distributed import init_distributed
@@ -61,7 +57,7 @@ def extract_radiology_segmentation(
         raise ValueError(f"Invalid model mode: {model_mode}")
     return
 
-def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir, class_name, 
+def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
                                   format='nifti', is_CT=True, site=None, beta_params=None, device="gpu"):
     """extracting radiomic features slice by slice in a size of (1024, 1024)
         img_paths: a list of paths for single-phase images
@@ -74,12 +70,11 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir, class_na
     """
 
     # Build model config
-    opt = load_opt_from_config_files(["configs/biomedparse_inference.yaml"])
+    opt = load_opt_from_config_files(["CIA/configs/biomedparse_inference.yaml"])
     opt = init_distributed(opt)
 
     # Load model from pretrained weights
-    pretrained_pth = 'output_singlephase_breastcancer/biomed_seg_lang_v1.yaml_conf~/run_1/00039390/default/model_state_dict.pt'
-    # pretrained_pth = 'output_multiphase_breastcancer/biomed_seg_lang_v1.yaml_conf~/run_1/00039390/default/model_state_dict.pt'
+    pretrained_pth = 'CIA/checkpoints/model_state_dict.pt'
 
     if device == 'gpu':
         model = BaseModel(opt, build_model(opt)).from_pretrained(pretrained_pth).eval().cuda()
@@ -137,6 +132,14 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir, class_na
         nifti_img = nib.Nifti1Image(final_mask, affine)
         nib.save(nifti_img, save_mask_path)
     return
+
+def load_beta_params(modality, site, target):
+    beta_path = 'CIA/analysis/tumor_segmentation/Beta_params.json'
+    with open(beta_path, 'r') as f:
+        data = json.load(f)
+        beta_params = data[f"{modality}-{site}"][target]
+
+    return beta_params
 
 if __name__ == "__main__":
     ## argument parser
