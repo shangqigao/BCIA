@@ -146,6 +146,9 @@ import os
 import pandas as pd
 import shutil
 
+import sys
+sys.path.append('./CIA/')
+
 # === OPTIONAL IMPORTS: only needed if you modify or extend nnUNet input/output handling ===
 # You can remove unused imports above if not needed for your solution
 import numpy as np
@@ -195,7 +198,7 @@ class Model:
 
         extract_BiomedParse_segmentation(
             img_paths=multiphase_images,
-            text_prompts=["breast tumor"]*len(multiphase_images),
+            text_prompts=text_prompts,
             save_dir=output_dir_cia,
             is_CT=self.modality == 'CT',
             site=self.site,

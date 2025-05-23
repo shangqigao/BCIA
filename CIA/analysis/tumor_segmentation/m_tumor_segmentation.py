@@ -1,5 +1,5 @@
 import sys
-sys.path.append('./')
+sys.path.append('./CIA/')
 
 import json
 import torch
@@ -18,7 +18,7 @@ from inference_utils.inference import interactive_infer_image
 from inference_utils.processing_utils import read_dicom
 from inference_utils.processing_utils import read_nifti_inplane
 
-from m_post_processing import remove_inconsistent_objects
+from analysis.tumor_segmentation.m_post_processing import remove_inconsistent_objects
 
 def extract_radiology_segmentation(
         img_paths, 
@@ -47,7 +47,6 @@ def extract_radiology_segmentation(
             img_paths,
             text_prompts,
             save_dir,
-            class_name,
             format=img_format,
             is_CT=is_CT,
             site=site,
@@ -147,7 +146,7 @@ if __name__ == "__main__":
     parser.add_argument('--img_dir', default="/home/s/sg2162/projects/TCIA_NIFTI/image")
     parser.add_argument('--beta_params', default="/home/s/sg2162/projects/TCIA_NIFTI/image")
     parser.add_argument('--modality', default="MRI", choices=["CT", "MRI"], type=str)
-    parser.add_argument('--phase', default="single", choices=["single", "multiple"], type=str)
+    parser.add_argument('--phase', default="multiphase", choices=["single", "multiple"], type=str)
     parser.add_argument('--format', default="nifti", choices=["dicom", "nifti"], type=str)
     parser.add_argument('--site', default="breast", type=str)
     parser.add_argument('--target', default="tumor", type=str)

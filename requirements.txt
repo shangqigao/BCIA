@@ -1,4 +1,8 @@
 # Add here additional packages not included in the base MAMA-MIA Docker (lgarrucho/codabench-gpu:latest)
-huggingface-hub==0.17.3
+Pillow==9.4.0
+timm==0.4.12
+nltk==3.8.1
+git+https://github.com/MaureenZOU/detectron2-xyz.git
+transformers==4.34.0
 mpi4py==3.1.5
-nibabel==5.3.2
+kornia==0.7.0

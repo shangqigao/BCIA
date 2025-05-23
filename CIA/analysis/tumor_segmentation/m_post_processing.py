@@ -64,9 +64,9 @@ def remove_inconsistent_objects(mask_3d, min_slices=3, min_dice=0.2,
 
         # calculate p-value of statistical test
         if prob_3d is not None and image_4d is not None and beta_params is not None:
-            object_prob = np.zeros_like(mask_3d)
+            object_prob = np.zeros_like(prob_3d)
             object_prob[component] = prob_3d[component]
-            object_prob = (255*object_prob).astype(np.int8)
+            object_prob = (255*object_prob).astype(np.uint8)
             pvalue = compute_beta_pvalue(object_prob, image_4d, beta_params)
             if pvalue < alpha:
                 num_objects += 1
