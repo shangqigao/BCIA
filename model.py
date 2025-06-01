@@ -251,58 +251,58 @@ class Model:
 
         return output_dir_final
     
-    def predict_classification(self, output_dir):
-        """
-        Task 2 — Predict treatment response (pCR).
-        You MUST define this method if participating in Task 2.
+    # def predict_classification(self, output_dir):
+    #     """
+    #     Task 2 — Predict treatment response (pCR).
+    #     You MUST define this method if participating in Task 2.
 
-        Args:
-            output_dir (str): Directory to save output predictions.
+    #     Args:
+    #         output_dir (str): Directory to save output predictions.
 
-        Returns:
-            pd.DataFrame: DataFrame with patient_id, pcr prediction, and score.
-        """
-        patient_ids = self.dataset.get_patient_id_list()
-        predictions = []
+    #     Returns:
+    #         pd.DataFrame: DataFrame with patient_id, pcr prediction, and score.
+    #     """
+    #     patient_ids = self.dataset.get_patient_id_list()
+    #     predictions = []
         
-        for patient_id in patient_ids:
-            if self.predicted_segmentations:
-                # === Example using segmentation-derived feature (volume) ===
-                seg_path = os.path.join(self.predicted_segmentations, f"{patient_id}.nii.gz")
-                if not os.path.exists(seg_path):
-                    continue
+    #     for patient_id in patient_ids:
+    #         if self.predicted_segmentations:
+    #             # === Example using segmentation-derived feature (volume) ===
+    #             seg_path = os.path.join(self.predicted_segmentations, f"{patient_id}.nii.gz")
+    #             if not os.path.exists(seg_path):
+    #                 continue
                 
-                segmentation = sitk.ReadImage(seg_path)
-                segmentation_array = sitk.GetArrayFromImage(segmentation)
-                # You can use the predicted segmentation to compute features if task 1 is done
-                # For example, compute the volume of the segmented region
-                # ...
+    #             segmentation = sitk.ReadImage(seg_path)
+    #             segmentation_array = sitk.GetArrayFromImage(segmentation)
+    #             # You can use the predicted segmentation to compute features if task 1 is done
+    #             # For example, compute the volume of the segmented region
+    #             # ...
 
-                # RANDOM CLASSIFIER AS EXAMPLE
-                # Replace with real feature extraction + ML model
-                probability = np.random.rand()
-                pcr_prediction = int(probability > 0.5)
+    #             # RANDOM CLASSIFIER AS EXAMPLE
+    #             # Replace with real feature extraction + ML model
+    #             probability = np.random.rand()
+    #             pcr_prediction = int(probability > 0.5)
 
-            else:
-                # === Example using raw image intensity for rule-based prediction ===
-                image_paths = self.dataset.get_dce_mri_path_list(patient_id)
-                if not image_paths:
-                    continue
+    #         else:
+    #             # === Example using raw image intensity for rule-based prediction ===
+    #             image_paths = self.dataset.get_dce_mri_path_list(patient_id)
+    #             if not image_paths:
+    #                 continue
                 
-                image = sitk.ReadImage(image_paths[1])
-                image_array = sitk.GetArrayFromImage(image)
-                mean_intensity = np.mean(image_array)
-                pcr_prediction = 1 if mean_intensity > 500 else 0
-                probability = np.random.rand() if pcr_prediction == 1 else np.random.rand() / 2
+    #             image = sitk.ReadImage(image_paths[1])
+    #             image_array = sitk.GetArrayFromImage(image)
+    #             mean_intensity = np.mean(image_array)
+    #             pcr_prediction = 1 if mean_intensity > 500 else 0
+    #             probability = np.random.rand() if pcr_prediction == 1 else np.random.rand() / 2
             
-            # === MANDATORY output format ===
-            predictions.append({
-                "patient_id": patient_id,
-                "pcr": pcr_prediction,
-                "score": probability
-            })
+    #         # === MANDATORY output format ===
+    #         predictions.append({
+    #             "patient_id": patient_id,
+    #             "pcr": pcr_prediction,
+    #             "score": probability
+    #         })
 
-        return pd.DataFrame(predictions)
+    #     return pd.DataFrame(predictions)
 
 # IMPORTANT: The definition of this method will skip the execution of `predict_segmentation` and `predict_classification` if defined
     # def predict_segmentation_and_classification(self, output_dir):
