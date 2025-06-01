@@ -4,7 +4,7 @@ import torch
 import pickle
 import subprocess
 
-from mpi4py import MPI
+# from mpi4py import MPI
 import torch.distributed as dist
 
 
@@ -18,8 +18,8 @@ def apply_distributed(opt):
         master_address = None
         master_port = None
 
-    master_address = MPI.COMM_WORLD.bcast(master_address, root=0)
-    master_port = MPI.COMM_WORLD.bcast(master_port, root=0)
+    # master_address = MPI.COMM_WORLD.bcast(master_address, root=0)
+    # master_port = MPI.COMM_WORLD.bcast(master_port, root=0)
 
     if torch.distributed.is_available() and opt['world_size'] > 1:
         init_method_url = 'tcp://{}:{}'.format(master_address, master_port)
