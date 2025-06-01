@@ -17,8 +17,8 @@
 source ~/.bashrc
 conda activate pancia
 
-export OMPI_ALLOW_RUN_AS_ROOT=1
-export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+# export OMPI_ALLOW_RUN_AS_ROOT=1
+# export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
 
 # fit Beta distributions on training data
 # img_dir="/home/sg2162/rds/rds-ge-sow2-imaging-MRNJucHuBik/PanCancer/BiomedParse_TumorSegmentation/Multiphase_Breast_Tumor/train"
@@ -31,7 +31,7 @@ export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
 img_dir="/home/sg2162/rds/hpc-work/sanity-check/images"
 save_dir="/home/sg2162/rds/hpc-work/sanity-check/predictions"
 beta_params="/home/sg2162/rds/hpc-work/BCIA/CIA/analysis/tumor_segmentation/Beta_params.json"
-srun --mpi=pmi2 python CIA/analysis/tumor_segmentation/m_tumor_segmentation.py \
+srun python CIA/analysis/tumor_segmentation/m_tumor_segmentation.py \
             --img_dir $img_dir \
             --save_dir $save_dir \
             --beta_params $beta_params
