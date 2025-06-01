@@ -1,5 +1,12 @@
+import os
 import sys
-sys.path.append('./CIA/')
+
+# Get the directory where the current script resides
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Add a relative subdirectory to sys.path
+relative_path = os.path.join(script_dir, '../../')
+sys.path.append(relative_path)
 
 import json
 import torch
@@ -69,11 +76,11 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     """
 
     # Build model config
-    opt = load_opt_from_config_files(["CIA/configs/biomedparse_inference.yaml"])
+    opt = load_opt_from_config_files([os.path.join(relative_path, "configs/biomedparse_inference.yaml")])
     opt = init_distributed(opt)
 
     # Load model from pretrained weights
-    pretrained_pth = 'CIA/checkpoints/model_state_dict.pt'
+    pretrained_pth = os.path.join(relative_path, 'checkpoints/model_state_dict.pt')
 
     if device == 'gpu':
         model = BaseModel(opt, build_model(opt)).from_pretrained(pretrained_pth).eval().cuda()
@@ -133,7 +140,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     return
 
 def load_beta_params(modality, site, target):
-    beta_path = 'CIA/analysis/tumor_segmentation/Beta_params.json'
+    beta_path = os.path.join(relative_path, 'analysis/tumor_segmentation/Beta_params.json')
     with open(beta_path, 'r') as f:
         data = json.load(f)
         beta_params = data[f"{modality}-{site}"][target]
