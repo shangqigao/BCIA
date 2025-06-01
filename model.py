@@ -147,7 +147,12 @@ import pandas as pd
 import shutil
 
 import sys
-sys.path.append('./CIA/')
+# Get the directory where the current script resides
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Add a relative subdirectory to sys.path
+relative_path = os.path.join(script_dir, 'CIA')
+sys.path.append(relative_path)
 
 # === OPTIONAL IMPORTS: only needed if you modify or extend nnUNet input/output handling ===
 # You can remove unused imports above if not needed for your solution
