@@ -51,9 +51,51 @@ def dice_loss(
     loss = 1 - (numerator + 1) / (denominator + 1)
     return loss.sum() / num_masks
 
+def focal_tversky_loss(
+        inputs: torch.Tensor,
+        targets: torch.Tensor,
+        num_masks: float,
+    ):
+    """
+    Compute the Focal Tversky Loss.
+
+    Args:
+        inputs (Tensor): Raw logits from the model (N, H, W) or (N, 1, H, W).
+        targets (Tensor): Ground truth binary masks (same shape as inputs).
+        alpha (float): Weight for false positives.
+        beta (float): Weight for false negatives.
+        gamma (float): Focusing parameter.
+        smooth (float): Smoothing constant to avoid division by zero.
+
+    Returns:
+        torch.Tensor: Scalar loss value.
+    """
+    inputs = inputs.sigmoid()
+    inputs = inputs.flatten(1)
+
+    # Compute TP, FP, FN
+    TP = (inputs * targets).sum(-1)
+    FP = (inputs * (1 - targets)).sum(-1)
+    FN = ((1 - inputs) * targets).sum(-1)
+
+    # Tversky index
+    alpha=0.3
+    beta=0.7
+    gamma=0.75
+    smooth=1e-6
+    denominator = TP + alpha * FP + beta * FN + smooth
+    tversky = (TP + smooth) / torch.clamp(denominator, min=1e-4)
+    tversky = torch.clamp(tversky, min=1e-4, max=1.0)
+
+    # Focal Tversky loss
+    loss = torch.pow(1 - tversky, gamma)
+
+    return loss.sum() / num_masks
+
 
 dice_loss_jit = torch.jit.script(
     dice_loss
+    # focal_tversky_loss
 )  # type: torch.jit.ScriptModule
 
 
@@ -688,6 +730,30 @@ class SetCriterion(nn.Module):
             box_ops.box_cxcywh_to_xyxy(target_boxes)))
         losses['loss_giou_0'] = loss_giou.sum() / num_boxes
         return losses
+    
+    def loss_decomposition(self, outputs, targets, indices, num_boxes, layer_id, extra):
+        """compute the Bayesian loss for image decomposition, consists of data fitting and KL divergence terms
+        """
+        if layer_id >= 1:
+            return {'loss_decomposition_bayes_0': 0}
+        
+        assert 'decomposition' in extra
+        decomp_outputs = extra['decomposition']
+        N = decomp_outputs["normalization"]
+        loss_y = torch.sum(decomp_outputs["kl_y"]) / N
+        loss_mu_m = torch.sum(decomp_outputs["kl_mu_m"]) / N
+        loss_sigma_m = torch.sum(decomp_outputs["kl_sigma_m"]) / N
+        loss_mu_x = torch.sum(decomp_outputs["kl_mu_x"]) / N
+        loss_sigma_x = torch.sum(decomp_outputs["kl_sigma_x"]) / N
+        loss_Bayes = (
+            loss_y
+            + loss_mu_m
+            + loss_sigma_m
+            + loss_mu_x
+            + loss_sigma_x
+        )
+        losses = {'loss_decomposition_bayes_0': loss_Bayes}
+        return losses
 
     def _get_src_permutation_idx(self, indices):
         # permute predictions following indices
@@ -712,6 +778,7 @@ class SetCriterion(nn.Module):
             'groundings': self.loss_groundings,
             'labels_openimage': self.loss_labels_openimage,
             'spatials': self.loss_spatials,
+            'decomposition': self.loss_decomposition,
         }
         assert loss in loss_map, f"do you really want to compute {loss} loss?"
         return loss_map[loss](outputs, targets, indices, num_masks, layer_id, extra)

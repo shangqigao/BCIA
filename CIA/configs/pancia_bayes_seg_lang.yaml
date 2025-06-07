@@ -8,7 +8,7 @@
 # Define Test/Trainer/Saving
 PIPELINE: XDecoderPipeline
 TRAINER: xdecoder
-SAVE_DIR: "./output"
+SAVE_DIR: "./output_bayes"
 base_path: "./"
 
 # Resume Logistic
@@ -43,12 +43,25 @@ STANDARD_TEXT_FOR_EVAL: False
 ##################
 VERBOSE: true
 MODEL:
-  NAME: seem_model_v1
+  NAME: bayes_seem_model
   HEAD: xdecoder_head
   MASK_ON: false
   KEYPOINT_ON: false
   LOAD_PROPOSALS: false
   DIM_PROJ: 512
+  DECOMPOSITION:
+    NAME: bayes_decomposition
+    BAYES:
+      ENABLE: True
+    IN_CHANNEL: 3
+    MU_0: 0
+    SIGMA_0: 1
+    GAMMA_RHO: 2
+    PHI_RHO: 1e-6
+    GAMMA_UPSILON: 2
+    PHI_UPSILON: 1e-8
+    BAYES_LOSS_WEIGHT: 100
+    VIS_EVERY_N_STEPS: 500
   TEXT:
     ARCH: vlpencoder
     NAME: transformer
@@ -244,7 +257,6 @@ DATASETS:
     # - "biomed_Prostate_Tumor_train"
     # - "biomed_Uterus_Tumor_train"
     - "biomed_Multiphase_Breast_Tumor_train"
-    # - "biomed_Multiphase_NP_Breast_Tumor_train"
 
   TEST:
     # Add your registered test datasets here
@@ -260,7 +272,6 @@ DATASETS:
     # - "biomed_Prostate_Tumor_test"
     # - "biomed_Uterus_Tumor_test"
     - "biomed_Multiphase_Breast_Tumor_test"
-    # - "biomed_Multiphase_NP_Breast_Tumor_test"
 
   CLASS_CONCAT: false
   SIZE_DIVISIBILITY: 32
@@ -334,9 +345,11 @@ SOLVER:
   OPTIMIZER: "ADAMW"
   LR_SCHEDULER_NAME: "WarmupMultiStepLR"
   LR_MULTIPLIER:
+    decomposition: 1.0
     backbone: 0.1
     lang_encoder: 0.1
   FIX_PARAM:
+    decomposition: false
     backbone: True
     lang_encoder: True
     pixel_decoder: True

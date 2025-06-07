@@ -76,11 +76,11 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     """
 
     # Build model config
-    opt = load_opt_from_config_files([os.path.join(relative_path, "configs/biomedparse_inference.yaml")])
+    opt = load_opt_from_config_files([os.path.join(relative_path, "configs/pancia_bayes_inference.yaml")])
     opt = init_distributed(opt)
 
     # Load model from pretrained weights
-    pretrained_pth = os.path.join(relative_path, 'checkpoints/model_state_dict.pt')
+    pretrained_pth = os.path.join(relative_path, 'checkpoints/multiphase_bayes_breastcancer_aug_ftl.pt')
 
     if device == 'gpu':
         model = BaseModel(opt, build_model(opt)).from_pretrained(pretrained_pth).eval().cuda()
@@ -201,5 +201,5 @@ if __name__ == "__main__":
             is_CT=args.modality == 'CT',
             site=args.site,
             img_format=args.format,
-            beta_params=beta_params
+            beta_params=None
         )

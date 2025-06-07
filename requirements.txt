@@ -1,8 +1,15 @@
+--find-links file:///app/ingested_program/sample_code_submission/
+detectron2==0.6
+
 # Add here additional packages not included in the base MAMA-MIA Docker (lgarrucho/codabench-gpu:latest)
+
 Pillow==9.4.0
 timm==0.4.12
 nltk==3.8.1
-git+https://github.com/MaureenZOU/detectron2-xyz.git
+
+#git+https://github.com/MaureenZOU/detectron2-xyz.git
 transformers==4.34.0
-mpi4py==3.1.5
+#mpi4py==3.1.5
 kornia==0.7.0
+tensorboardX==2.6.2.2
+monai==1.4.0
