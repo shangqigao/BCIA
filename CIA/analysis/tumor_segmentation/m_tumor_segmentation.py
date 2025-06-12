@@ -26,6 +26,7 @@ from inference_utils.processing_utils import read_dicom
 from inference_utils.processing_utils import read_nifti_inplane
 
 from analysis.tumor_segmentation.m_post_processing import remove_inconsistent_objects
+from peft import PeftModel, PeftConfig
 
 def extract_radiology_segmentation(
         img_paths, 
@@ -83,9 +84,15 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     pretrained_pth = os.path.join(relative_path, 'checkpoints/multiphase_breastcancer.pt')
 
     if device == 'gpu':
-        model = BaseModel(opt, build_model(opt)).from_pretrained(pretrained_pth).eval().cuda()
+        if not opt['LoRA'].get('ENABLE', False):
+            model = BaseModel(opt, build_model(opt)).from_pretrained(pretrained_pth).eval().cuda()
+        else:
+            config = PeftConfig.from_pretrained(pretrained_pth)
+            model = BaseModel(opt, build_model(opt)).from_pretrained(config.base_model_name_or_path)
+            model = PeftModel.from_pretrained(model, pretrained_pth).model.eval().cuda()
     else:
-        model = BaseModel(opt, build_model(opt)).from_pretrained(pretrained_pth).eval().cpu()
+        raise ValueError(f'Require gpu, but got {device}')
+    
     with torch.no_grad():
         model.model.sem_seg_head.predictor.lang_encoder.get_text_embeddings(BIOMED_CLASSES + ["background"], is_eval=True)
     
