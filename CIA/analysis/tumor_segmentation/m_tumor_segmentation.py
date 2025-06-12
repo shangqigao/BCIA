@@ -76,11 +76,11 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     """
 
     # Build model config
-    opt = load_opt_from_config_files([os.path.join(relative_path, "configs/pancia_bayes_inference.yaml")])
+    opt = load_opt_from_config_files([os.path.join(relative_path, "configs/biomedparse_inference.yaml")])
     opt = init_distributed(opt)
 
     # Load model from pretrained weights
-    pretrained_pth = os.path.join(relative_path, 'checkpoints/multiphase_bayes_breastcancer_aug_ftl.pt')
+    pretrained_pth = os.path.join(relative_path, 'checkpoints/multiphase_breastcancer.pt')
 
     if device == 'gpu':
         model = BaseModel(opt, build_model(opt)).from_pretrained(pretrained_pth).eval().cuda()
@@ -176,7 +176,8 @@ if __name__ == "__main__":
                 multiphase_keys = ["_0000.nii.gz", "_0001.nii.gz", "_0002.nii.gz"]
                 nii_paths = [p for p in nii_paths if any(k in p.name for k in multiphase_keys)]
                 img_paths.append(sorted(nii_paths))
-    text_prompts = [[f'{args.site} {args.target}']]*len(img_paths)
+    # text_prompts = [[f'{args.site} {args.target} in {args.site} {args.modality}']]*len(img_paths)
+    text_prompts = [[f'blood vessel']]*len(img_paths)
     save_dir = pathlib.Path(args.save_dir)
 
     with open(args.beta_params, 'r') as f:
