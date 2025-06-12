@@ -81,15 +81,15 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     opt = init_distributed(opt)
 
     # Load model from pretrained weights
-    pretrained_pth = os.path.join(relative_path, 'checkpoints/multiphase_breastcancer.pt')
+    pretrained_pth = os.path.join(relative_path, 'checkpoints/biomedparse_v1.pt')
+    lora_pth = os.path.join(relative_path, 'checkpoints/LoRA_multiphase_breast')
 
     if device == 'gpu':
-        if not opt['LoRA'].get('ENABLE', False):
+        if not opt.get('LoRA', False):
             model = BaseModel(opt, build_model(opt)).from_pretrained(pretrained_pth).eval().cuda()
         else:
-            config = PeftConfig.from_pretrained(pretrained_pth)
-            model = BaseModel(opt, build_model(opt)).from_pretrained(config.base_model_name_or_path)
-            model = PeftModel.from_pretrained(model, pretrained_pth).model.eval().cuda()
+            model = BaseModel(opt, build_model(opt)).from_pretrained(pretrained_pth)
+            model = PeftModel.from_pretrained(model, lora_pth).model.eval().cuda()
     else:
         raise ValueError(f'Require gpu, but got {device}')
     
@@ -184,7 +184,7 @@ if __name__ == "__main__":
                 nii_paths = [p for p in nii_paths if any(k in p.name for k in multiphase_keys)]
                 img_paths.append(sorted(nii_paths))
     # text_prompts = [[f'{args.site} {args.target} in {args.site} {args.modality}']]*len(img_paths)
-    text_prompts = [[f'blood vessel']]*len(img_paths)
+    text_prompts = [[f'breast tumor in breast MRI']]*len(img_paths)
     save_dir = pathlib.Path(args.save_dir)
 
     with open(args.beta_params, 'r') as f:

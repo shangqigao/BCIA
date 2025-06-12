@@ -25,6 +25,7 @@ class BayesDec(nn.Module):
 
         self.res_shape = ResNet_shape(num_in_ch=self.in_channel, num_out_ch=2*self.in_channel)
         self.res_appear = ResNet_appearance(num_in_ch=self.in_channel, num_out_ch=2*self.in_channel, num_block=6, bn=True)
+        self.group_norm = nn.GroupNorm(self.in_channel, self.in_channel)
 
         Dx = torch.zeros([1, 1, 3, 3], dtype=torch.float)
         Dx[:, :, 1, 1] = 1
@@ -103,6 +104,7 @@ class BayesDec(nn.Module):
         }
 
         pred = x if self.training else mu_x
+        pred = self.group_norm(pred)
         out = {
             "pred": pred,
             "kl_y": kl_y,

@@ -5,6 +5,7 @@ SAVE_DIR: '../../data/output/test'
 base_path: "./"
 
 # Resume Logistic
+LoRA: True
 RESUME: false
 WEIGHT: false
 RESUME_FROM: ''

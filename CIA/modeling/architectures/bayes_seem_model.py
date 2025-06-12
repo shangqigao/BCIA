@@ -298,7 +298,7 @@ class BayesianSEEM(nn.Module):
     def device(self):
         return self.pixel_mean.device
 
-    def forward(self, batched_inputs, mode='default'):
+    def forward(self, batched_inputs, mode='default', **kwargs):
         """
         Args:
             batched_inputs: a list, batched outputs of :class:`DatasetMapper`.
