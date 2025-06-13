@@ -134,6 +134,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
                 meta_data['view'] = phase
                 meta_data['slice_index'] = f'{i:03}'
                 meta_data['modality'] = 'CT' if is_CT else 'MRI'
+                meta_data['site'] = site
                 meta_data['target'] = text_prompt
                 if len(spacing) == 2:
                     meta_data['pixel_spacing'] = spacing
@@ -142,11 +143,12 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
                     pixel_index = list(set([0, 1, 2]) - {slice_axis})
                     pixel_spacing = [spacing[i] for i in pixel_index]
                     meta_data['pixel_spacing'] = pixel_spacing
-                text_prompt = create_prompts(meta_data)
+                text_prompt = create_prompts(meta_data)[5]
             # print(f"Segmenting slice [{i+1}/{len(images)}] ...")
 
             # resize_mask=False would keep mask size to be (1024, 1024)
             pred_prob = interactive_infer_image(model, Image.fromarray(img), text_prompt, resize_mask=True, return_feature=False)
+            pred_prob = np.max(pred_prob, axis=0, keepdims=True)
             if beta_params is not None:
                 image_4d.append(img)
                 prob_3d.append(pred_prob)
@@ -184,8 +186,8 @@ def load_beta_params(modality, site, target):
     return beta_params
 
 def create_prompts(meta_data):
-    basic_keys = ['view', 'slice_index', 'modality', 'site', 'target']
-    assert all(meta_data.get(k) is not None for k in keys), f"all basic info {basic_keys} should be provided"
+    keys = ['view', 'slice_index', 'modality', 'site', 'target']
+    assert all(meta_data.get(k) is not None for k in keys), f"all basic info {keys} should be provided"
     view = meta_data['view']
     slice_index = meta_data['slice_index']
     modality = meta_data['modality']
