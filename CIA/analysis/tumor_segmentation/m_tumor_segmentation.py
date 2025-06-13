@@ -8,12 +8,14 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 relative_path = os.path.join(script_dir, '../../')
 sys.path.append(relative_path)
 
+import ast
 import json
 import torch
 import pathlib
 import argparse
 import numpy as np
 import nibabel as nib
+import pandas as pd
 from PIL import Image
 from modeling.BaseModel import BaseModel
 from modeling import build_model
@@ -36,8 +38,10 @@ def extract_radiology_segmentation(
         save_dir,
         is_CT=True,
         site='kidney',
+        meta_list=None,
         img_format='nifti',
-        beta_params=None
+        beta_params=None,
+        prompt_ensemble=False
     ):
     """extract segmentation from radiology images
     Args:
@@ -58,19 +62,26 @@ def extract_radiology_segmentation(
             format=img_format,
             is_CT=is_CT,
             site=site,
-            beta_params=beta_params
+            meta_list=meta_list,
+            beta_params=beta_params,
+            prompt_ensemble=prompt_ensemble
         )
     else:
         raise ValueError(f"Invalid model mode: {model_mode}")
     return
 
 def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
-                                  format='nifti', is_CT=True, site=None, beta_params=None, device="gpu"):
+                                  format='nifti', is_CT=True, site=None, 
+                                  meta_list=None, beta_params=None, 
+                                  prompt_ensemble=False, device="gpu"):
     """extracting radiomic features slice by slice in a size of (1024, 1024)
         img_paths: a list of paths for single-phase images
             or a list of lists, where each list has paths of multi-phase images.
             For multi-phase images, only nifti format is allowed.
         text_prompts: a list of strings with the same length as the img_paths
+        meta_list (list): a list of imaging metadata, 
+            such as 'field_strength', 'bilateral', 'scanner_manufacturer'
+        prompt_ensemble: if true, use prompt ensemble
         beta_params: the parameters of Beta distribution, 
             if provided, it would be used to compute p-values of segmented objects
             if p-value is less than alpha, i.e., 0.05, the object would be removed
@@ -96,13 +107,14 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     with torch.no_grad():
         model.model.sem_seg_head.predictor.lang_encoder.get_text_embeddings(BIOMED_CLASSES + ["background"], is_eval=True)
     
-    for img_path, text_prompt in zip(img_paths, text_prompts):
+    for idx, (img_path, text_prompt) in enumerate(zip(img_paths, text_prompts)):
         # read slices from dicom or nifti
         if format == 'dicom':
             dicom_dir = pathlib.Path(img_path)
             assert pathlib.Path(img_path).is_dir()
             dicom_paths = sorted(dicom_dir.glob('*.dcm'))
             images = [read_dicom(p, is_CT, site, keep_size=True, return_spacing=True) for p in dicom_paths]
+            slice_axis, affine = None, np.eye(4)
         elif format == 'nifti':
             images, slice_axis, affine = read_nifti_inplane(img_path, is_CT, site, keep_size=True, return_spacing=True)
         else:
@@ -112,8 +124,25 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
         image_4d = []
         prob_3d = []
         for i, element in enumerate(images):
-            assert len(element) == 2
-            img, spacing = element
+            assert len(element) == 3
+            img, spacing, phase = element
+
+            # use prompt ensemble
+            if prompt_ensemble:
+                meta_data = {} if meta_list is None else meta_list[idx]
+                assert isinstance(meta_data, dict)
+                meta_data['view'] = phase
+                meta_data['slice_index'] = f'{i:03}'
+                meta_data['modality'] = 'CT' if is_CT else 'MRI'
+                meta_data['target'] = text_prompt
+                if len(spacing) == 2:
+                    meta_data['pixel_spacing'] = spacing
+                else:
+                    assert len(spacing) == 3
+                    pixel_index = list(set([0, 1, 2]) - {slice_axis})
+                    pixel_spacing = [spacing[i] for i in pixel_index]
+                    meta_data['pixel_spacing'] = pixel_spacing
+                text_prompt = create_prompts(meta_data)
             # print(f"Segmenting slice [{i+1}/{len(images)}] ...")
 
             # resize_mask=False would keep mask size to be (1024, 1024)
@@ -154,6 +183,44 @@ def load_beta_params(modality, site, target):
 
     return beta_params
 
+def create_prompts(meta_data):
+    basic_keys = ['view', 'slice_index', 'modality', 'site', 'target']
+    assert all(meta_data.get(k) is not None for k in keys), f"all basic info {basic_keys} should be provided"
+    view = meta_data['view']
+    slice_index = meta_data['slice_index']
+    modality = meta_data['modality']
+    site = meta_data['site']
+    target_name = meta_data['target']
+    target = 'tumor' if 'tumor' in target_name else target_name
+
+    basic_prompts = [
+        f"{target_name} in {site} {modality}",
+        f"{view} slice {slice_index} showing {target} in {site}",
+        f"{target} located in the {site} on {modality}",
+        f"{view} {site} {modality} with {target}",
+        f"{target} visible in slice {slice_index} of {modality}",
+    ]
+
+    # meta information
+    keys = ['pixel_spacing', 'field_strength', 'bilateral', 'scanner_manufacturer']
+    meta_prompts = []
+    if all(meta_data.get(k) is not None for k in keys):
+        pixel_spacing = meta_data['pixel_spacing']
+        x_spacing, y_spacing = pixel_spacing[0], pixel_spacing[1]
+        field_strength = meta_data['field_strength']
+        bilateral_mri = meta_data['bilateral']
+        lateral = 'bilateral' if bilateral_mri == 1 else 'unilateral'
+        manufacturer = meta_data['scanner_manufacturer']
+        meta_prompts = [
+            f"a {modality} scan of the {lateral} {site}, {view} view, slice {slice_index}, pixel spacing {x_spacing:.2f}x{y_spacing:.2f} mm, showing {target}",
+            f"{lateral} {site} {modality} in {view} view at slice {slice_index} with spacing {x_spacing:.2f}x{y_spacing:.2f} mm, includes {target}",
+            f"{view} slice {slice_index} from a {field_strength}T {manufacturer} {modality} of the {lateral} {site}, pixel spacing {x_spacing:.2f}x{y_spacing:.2f} mm, showing {target}",
+            f"{lateral} {site} {modality} in {view} view, slice {slice_index}, using {field_strength}T {manufacturer} scanner, spacing {x_spacing:.2f}x{y_spacing:.2f} mm, showing {target}",
+            f"{modality} of the {lateral} {site} at slice {slice_index}, {view} view, spacing: {x_spacing:.2f}x{y_spacing:.2f} mm, scanned by {field_strength}T {manufacturer} scanner, shows {target}"
+        ]
+    
+    return basic_prompts + meta_prompts
+
 if __name__ == "__main__":
     ## argument parser
     parser = argparse.ArgumentParser()
@@ -164,6 +231,7 @@ if __name__ == "__main__":
     parser.add_argument('--format', default="nifti", choices=["dicom", "nifti"], type=str)
     parser.add_argument('--site', default="breast", type=str)
     parser.add_argument('--target', default="tumor", type=str)
+    parser.add_argument('--meta_info', default=None)
     parser.add_argument('--save_dir', default="/home/sg2162/rds/hpc-work/Experiments/radiomics", type=str)
     parser.add_argument('--model_mode', default="BiomedParse", choices=["SegVol", "BiomedParse"], type=str)
     args = parser.parse_args()
@@ -171,21 +239,44 @@ if __name__ == "__main__":
     if args.format == 'dicom':
         img_paths = pathlib.Path(args.img_dir).glob('*')
         img_paths = [p for p in img_paths if p.is_dir()]
+        patient_ids = [p.name for p in img_paths]
     else:
         if args.phase == "single":
             img_paths = sorted(pathlib.Path(args.img_dir).rglob('*_0001.nii.gz'))
+            patient_ids = [p.parent.name for p in img_paths]
         else:
             case_paths = sorted(pathlib.Path(args.img_dir).glob('*'))
             case_paths = [p for p in case_paths if p.is_dir()]
             img_paths = []
+            patient_ids = []
             for path in case_paths:
+                patient_ids.append(path.name)
                 nii_paths = path.glob("*.nii.gz")
                 multiphase_keys = ["_0000.nii.gz", "_0001.nii.gz", "_0002.nii.gz"]
                 nii_paths = [p for p in nii_paths if any(k in p.name for k in multiphase_keys)]
                 img_paths.append(sorted(nii_paths))
     # text_prompts = [[f'{args.site} {args.target} in {args.site} {args.modality}']]*len(img_paths)
-    text_prompts = [[f'breast tumor in breast MRI']]*len(img_paths)
+    text_prompts = [[f'{args.site} {args.target}']]*len(img_paths)
     save_dir = pathlib.Path(args.save_dir)
+
+    # read clinical and imaging info
+    if args.meta_info is not None:
+        df_meta = pd.read_excel(args.meta_info, sheet_name='dataset_info')
+        df_meta['pixel_spacing'] = df_meta['pixel_spacing'].apply(ast.literal_eval)
+        meta_list = []
+        for patient_id in patient_ids:
+            field_strength = df_meta.loc[df_meta["patient_id"] == patient_id, 'field_strength'].values[0]
+            bilateral_mri = df_meta.loc[df_meta["patient_id"] == patient_id, 'bilateral_mri'].values[0]
+            lateral = 'bilateral' if bilateral_mri == 1 else 'unilateral'
+            manufacturer = df_meta.loc[df_meta["patient_id"] == patient_id, 'manufacturer'].values[0]
+            meta_data = {
+                'field_strength': field_strength, 
+                'bilateral': lateral, 
+                'scanner_manufacturer': manufacturer
+            }
+            meta_list.append(meta_data)
+    else:
+        meta_list = None
 
     with open(args.beta_params, 'r') as f:
         data = json.load(f)
@@ -208,6 +299,8 @@ if __name__ == "__main__":
             save_dir=save_dir,
             is_CT=args.modality == 'CT',
             site=args.site,
+            meta_list=meta_list,
             img_format=args.format,
-            beta_params=None
+            beta_params=None,
+            prompt_ensemble=True
         )

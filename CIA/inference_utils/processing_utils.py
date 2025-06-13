@@ -131,6 +131,33 @@ def process_intensity_3Dimage(image_data, is_CT, site=None, keep_size=True):
         
     return resize_image.astype(np.uint8)
 
+def get_dicom_plane(ds):
+    """Infer scan plane from ImageOrientationPatient."""
+    orientation = ds.get("ImageOrientationPatient", None)
+    if orientation is None:
+        return "unknown"
+
+    # Convert to numpy for vector math
+    orientation = np.array(orientation)
+    x_dir = orientation[:3]
+    y_dir = orientation[3:]
+    
+    # Cross product gives normal vector of the image plane
+    normal = np.cross(x_dir, y_dir)
+    normal = np.abs(normal)  # direction doesn't matter
+
+    # Dominant axis determines the plane
+    axis = np.argmax(normal)
+
+    if axis == 0:
+        return "sagittal"
+    elif axis == 1:
+        return "coronal"
+    elif axis == 2:
+        return "axial"
+    else:
+        return "unknown"
+
 def read_dicom(image_path, is_CT, site=None, keep_size=False, return_spacing=False):
     # read dicom file and return pixel data
     
@@ -141,13 +168,14 @@ def read_dicom(image_path, is_CT, site=None, keep_size=False, return_spacing=Fal
     
     ds = pydicom.dcmread(image_path)
     spacing = ds.PixelSpacing
+    phase = get_dicom_plane(ds)
 
     image_array = ds.pixel_array * ds.RescaleSlope + ds.RescaleIntercept
     
     image_array = process_intensity_image(image_array, is_CT, site, keep_size)
     
     if return_spacing:
-        return image_array, spacing
+        return image_array, spacing, phase
     else:
         return image_array
 
@@ -251,7 +279,7 @@ def read_nifti_inplane(image_path, is_CT, site=None, keep_size=False, return_spa
                 slice_img = process_intensity_image(slice_img, is_CT, site, keep_size)
 
             if return_spacing:
-                image_list.append((slice_img, pixel_spacing))
+                image_list.append((slice_img, pixel_spacing, phase))
             else:
                 image_list.append(slice_img)
     else:
