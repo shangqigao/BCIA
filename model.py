@@ -192,9 +192,12 @@ class Model:
         # === Participants can modify how they prepare input ===
         patient_ids = self.dataset.get_patient_id_list()
         multiphase_images = []
+        meta_list = []
         for patient_id in patient_ids:
             images = self.dataset.get_dce_mri_path_list(patient_id)
             multiphase_images.append(images[:3])
+            patient_info = self.dataset.read_json_file(patient_id)
+            meta_list.append(patient_info["imaging_data"])
         text_prompts = [f"{self.site} {self.target}"]*len(multiphase_images)
         beta_params = load_beta_params(self.modality, self.site, self.target)
         # === Output folder for raw nnUNet segmentations ===
@@ -207,7 +210,9 @@ class Model:
             save_dir=output_dir_cia,
             is_CT=self.modality == 'CT',
             site=self.site,
-            beta_params=beta_params
+            meta_list=meta_list,
+            beta_params=beta_params,
+            prompt_ensemble=True
         )
         
        # === Final output folder (MANDATORY name) ===
