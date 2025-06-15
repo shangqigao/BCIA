@@ -35,15 +35,17 @@ def compute_beta_pvalue(mask_3d, image_4d, beta_params):
     return adj_p_value
 
 
-def remove_inconsistent_objects(mask_3d, min_slices=3, min_dice=0.2,
+def remove_inconsistent_objects(mask_3d, min_slices=13, min_dice=0.2, spacing=None, new_spacing=(1.0, 1.0, 1.0),
                                 prob_3d=None, image_4d=None, beta_params=None, alpha=0.05):
     """
     Remove 3D objects that are not consistent across slices.
 
     Args:
         mask_3d: 3D numpy array (binary mask).
-        min_slices: Minimum number of slices an object must appear in.
+        min_slices: Minimum number of slices an object must appear in. 1 percentile=13, min=6
         min_dice: Minimum Dice similarity between slices to consider consistent.
+        spacing: orginal voxel spacing (z, x, y)
+        new_spacing: new spacing for resampling
         prob_3d: a segmentation probability map with values in [0, 1]
         image_4d: a 4D image with shape [z, x, y, 3]
         beta_params: a list of Beta distribution parameters in terms of probability, r, g, b values
@@ -51,6 +53,13 @@ def remove_inconsistent_objects(mask_3d, min_slices=3, min_dice=0.2,
     Returns:
         Cleaned 3D mask.
     """
+    # resample to new spacing
+    if spacing is not None:
+        zoom_factors = tuple(os/ns for os, ns in zip(spacing, new_spacing))
+        original_shape = mask_3d.shape
+        mask_3d = zoom(mask_3d, zoom=zoom_factors, order=0)
+        new_shape = mask_3d.shape
+
     labeled, num = label(mask_3d)
     cleaned = np.zeros_like(mask_3d)
     num_objects = 0
@@ -60,6 +69,7 @@ def remove_inconsistent_objects(mask_3d, min_slices=3, min_dice=0.2,
         z_indices = np.any(component, axis=(1, 2)).nonzero()[0]
         
         if len(z_indices) < min_slices:
+            num_objects += 1
             continue  # Too few slices → skip
 
         # calculate p-value of statistical test
@@ -79,10 +89,15 @@ def remove_inconsistent_objects(mask_3d, min_slices=3, min_dice=0.2,
             slice2 = component[z2]
             if dice_coeff(slice1, slice2) < min_dice:
                 consistent = False
+                num_objects += 1
                 break # significantly inconsistant slices
 
         if consistent:
             cleaned[component] = 1
 
-    print(f"Removed {num_objects} of {num} objects with statistical significant difference!")
+    print(f"Removed {num_objects} of {num} objects with spatial inconsistency!")
+    # resample to orginal shape
+    if spacing is not None:
+        zoom_factors = tuple(os/ns for os, ns in zip(original_shape, new_shape))
+        cleaned = zoom(cleaned, zoom=zoom_factors, order=0)
     return cleaned

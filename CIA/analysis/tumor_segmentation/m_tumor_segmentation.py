@@ -114,7 +114,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
             assert pathlib.Path(img_path).is_dir()
             dicom_paths = sorted(dicom_dir.glob('*.dcm'))
             images = [read_dicom(p, is_CT, site, keep_size=True, return_spacing=True) for p in dicom_paths]
-            slice_axis, affine = None, np.eye(4)
+            slice_axis, affine = 0, np.eye(4)
         elif format == 'nifti':
             images, slice_axis, affine = read_nifti_inplane(img_path, is_CT, site, keep_size=True, return_spacing=True)
         else:
@@ -143,12 +143,18 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
                     pixel_index = list(set([0, 1, 2]) - {slice_axis})
                     pixel_spacing = [spacing[i] for i in pixel_index]
                     meta_data['pixel_spacing'] = pixel_spacing
-                text_prompt = create_prompts(meta_data)[5]
+                text_prompts = create_prompts(meta_data)
+                text_prompts = [text_prompts[9]]
+            else:
+                text_prompts = [text_prompt]
             # print(f"Segmenting slice [{i+1}/{len(images)}] ...")
 
             # resize_mask=False would keep mask size to be (1024, 1024)
-            pred_prob = interactive_infer_image(model, Image.fromarray(img), text_prompt, resize_mask=True, return_feature=False)
-            pred_prob = np.max(pred_prob, axis=0, keepdims=True)
+            ensemble_prob = []
+            for text_prompt in text_prompts:
+                pred_prob = interactive_infer_image(model, Image.fromarray(img), text_prompt, resize_mask=True, return_feature=False)
+                ensemble_prob.append(pred_prob)
+            pred_prob = np.max(np.concatenate(ensemble_prob, axis=0), axis=0, keepdims=True)
             if beta_params is not None:
                 image_4d.append(img)
                 prob_3d.append(pred_prob)
@@ -164,7 +170,13 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
             mask_3d = remove_inconsistent_objects(mask_3d, prob_3d=prob_3d, image_4d=image_4d, beta_params=beta_params)
         else:
             print("Post-processing by removing spatially inconsistent objects")
-            mask_3d = remove_inconsistent_objects(mask_3d)
+            if format == 'dicom':
+                voxel_spacing = None
+            else:
+                voxel_spacing = spacing.tolist()
+                z_spacing = voxel_spacing.pop(slice_axis)
+                voxel_spacing.insert(0, z_spacing)
+            mask_3d = remove_inconsistent_objects(mask_3d, spacing=voxel_spacing)
         final_mask = np.moveaxis(mask_3d, 0, slice_axis)
         
         if isinstance(img_path, list):
