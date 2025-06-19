@@ -154,6 +154,9 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 relative_path = os.path.join(script_dir, 'CIA')
 sys.path.append(relative_path)
 
+# Set the environment variable before importing Detectron2
+os.environ["DETECTRON2_DISABLE_CV2"] = "1"
+
 # === OPTIONAL IMPORTS: only needed if you modify or extend nnUNet input/output handling ===
 # You can remove unused imports above if not needed for your solution
 import numpy as np
