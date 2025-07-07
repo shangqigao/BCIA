@@ -202,7 +202,7 @@ class Model:
             patient_info = self.dataset.read_json_file(patient_id)
             meta_list.append(patient_info["imaging_data"])
         text_prompts = [f"{self.site} {self.target}"]*len(multiphase_images)
-        beta_params = load_beta_params(self.modality, self.site, self.target)
+        # beta_params = load_beta_params(self.modality, self.site, self.target)
         # === Output folder for raw nnUNet segmentations ===
         output_dir_cia = os.path.join(output_dir, 'cia_seg')
         os.makedirs(output_dir_cia, exist_ok=True)
@@ -214,7 +214,7 @@ class Model:
             is_CT=self.modality == 'CT',
             site=self.site,
             meta_list=meta_list,
-            beta_params=beta_params,
+            beta_params=None,
             prompt_ensemble=True
         )
         
