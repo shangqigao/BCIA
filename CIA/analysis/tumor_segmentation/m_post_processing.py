@@ -35,7 +35,7 @@ def compute_beta_pvalue(mask_3d, image_4d, beta_params):
     return adj_p_value
 
 
-def remove_inconsistent_objects(mask_3d, min_slices=13, min_dice=0.2, spacing=None, new_spacing=(1.0, 1.0, 1.0),
+def remove_inconsistent_objects(mask_3d, min_slices=6, min_dice=0.2, spacing=None, new_spacing=(1.0, 1.0, 1.0),
                                 prob_3d=None, image_4d=None, beta_params=None, alpha=0.05):
     """
     Remove 3D objects that are not consistent across slices.

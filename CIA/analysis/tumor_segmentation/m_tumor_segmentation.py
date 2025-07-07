@@ -28,7 +28,7 @@ from inference_utils.processing_utils import read_dicom
 from inference_utils.processing_utils import read_nifti_inplane
 
 from analysis.tumor_segmentation.m_post_processing import remove_inconsistent_objects
-from peft import PeftModel, PeftConfig
+from peft import LoraConfig, get_peft_model
 
 def extract_radiology_segmentation(
         img_paths, 
@@ -88,19 +88,24 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     """
 
     # Build model config
-    opt = load_opt_from_config_files([os.path.join(relative_path, "configs/biomedparse_inference.yaml")])
+    opt = load_opt_from_config_files([os.path.join(relative_path, "configs/pancia_bayes_inference.yaml")])
     opt = init_distributed(opt)
 
     # Load model from pretrained weights
-    pretrained_pth = os.path.join(relative_path, 'checkpoints/biomedparse_v1.pt')
-    lora_pth = os.path.join(relative_path, 'checkpoints/LoRA_multiphase_breast')
+    pretrained_pth = os.path.join(relative_path, 'checkpoints/LoRA+_multiphase_breast/model_state_dict.pt')
+    lora_pth = os.path.join(relative_path, 'checkpoints/bayes_LoRA+_sqrt')
 
     if device == 'gpu':
         if not opt.get('LoRA', False):
             model = BaseModel(opt, build_model(opt)).from_pretrained(pretrained_pth).eval().cuda()
         else:
-            model = BaseModel(opt, build_model(opt)).from_pretrained(pretrained_pth)
-            model = PeftModel.from_pretrained(model, lora_pth).model.eval().cuda()
+            with open(f'{lora_pth}/adapter_config.json', 'r') as f:
+                config = json.load(f)
+            model = get_peft_model(BaseModel(opt, build_model(opt)), LoraConfig(**config)).cuda()
+            ckpt = torch.load(os.path.join(lora_pth, 'module_training_states.pt'))['module']
+            ckpt = {key.replace('module.',''): ckpt[key] for key in ckpt.keys() if 'criterion' not in key}
+            model.load_state_dict(ckpt)
+            model = model.model.eval()
     else:
         raise ValueError(f'Require gpu, but got {device}')
     
