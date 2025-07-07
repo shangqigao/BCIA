@@ -92,13 +92,8 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     opt = init_distributed(opt)
 
     # Load model from pretrained weights
-<<<<<<< HEAD
     pretrained_pth = os.path.join(relative_path, 'checkpoints/LoRA+_multiphase_breast/model_state_dict.pt')
     lora_pth = os.path.join(relative_path, 'checkpoints/bayes_LoRA+_sqrt')
-=======
-    pretrained_pth = os.path.join(relative_path, 'checkpoints/LoRA_multiphase_breast/biomedparse_v1.pt')
-    lora_pth = os.path.join(relative_path, 'checkpoints/LoRA_multiphase_breast')
->>>>>>> dc7101985260e72d59bf4f7d6a9dc58525d9db57
 
     if device == 'gpu':
         if not opt.get('LoRA', False):
