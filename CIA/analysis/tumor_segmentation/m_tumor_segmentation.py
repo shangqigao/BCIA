@@ -41,7 +41,8 @@ def extract_radiology_segmentation(
         meta_list=None,
         img_format='nifti',
         beta_params=None,
-        prompt_ensemble=False
+        prompt_ensemble=False,
+        save_radiomics=False
     ):
     """extract segmentation from radiology images
     Args:
@@ -64,7 +65,8 @@ def extract_radiology_segmentation(
             site=site,
             meta_list=meta_list,
             beta_params=beta_params,
-            prompt_ensemble=prompt_ensemble
+            prompt_ensemble=prompt_ensemble,
+            save_radiomics=save_radiomics
         )
     else:
         raise ValueError(f"Invalid model mode: {model_mode}")
@@ -73,7 +75,8 @@ def extract_radiology_segmentation(
 def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
                                   format='nifti', is_CT=True, site=None, 
                                   meta_list=None, beta_params=None, 
-                                  prompt_ensemble=False, device="gpu"):
+                                  prompt_ensemble=False, save_radiomics=False,
+                                  device="gpu"):
     """extracting radiomic features slice by slice in a size of (1024, 1024)
         img_paths: a list of paths for single-phase images
             or a list of lists, where each list has paths of multi-phase images.
@@ -128,6 +131,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
         mask_3d = []
         image_4d = []
         prob_3d = []
+        feat_4d = []
         for i, element in enumerate(images):
             assert len(element) == 3
             img, spacing, phase = element
@@ -156,8 +160,13 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
 
             # resize_mask=False would keep mask size to be (1024, 1024)
             ensemble_prob = []
+            ensemble_feat = []
             for text_prompt in text_prompts:
-                pred_prob = interactive_infer_image(model, Image.fromarray(img), text_prompt, resize_mask=True, return_feature=False)
+                if save_radiomics:
+                    pred_prob, feature = interactive_infer_image(model, Image.fromarray(img), text_prompt, resize_mask=True, return_feature=True)
+                    ensemble_feat.append(feature)
+                else:
+                    pred_prob = interactive_infer_image(model, Image.fromarray(img), text_prompt, resize_mask=True, return_feature=False)
                 ensemble_prob.append(pred_prob)
             pred_prob = np.max(np.concatenate(ensemble_prob, axis=0), axis=0, keepdims=True)
             if beta_params is not None:
@@ -165,9 +174,14 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
                 prob_3d.append(pred_prob)
             pred_mask = (1*(pred_prob > 0.5)).astype(np.uint8)
             mask_3d.append(pred_mask)
+
+            if save_radiomics: 
+                slice_feat = np.mean(np.concatenate(ensemble_feat, axis=0), axis=0, keepdims=True)
+                feat_4d.append(slice_feat)
         
         # post-processing predicted masks
         mask_3d = np.concatenate(mask_3d, axis=0)
+        if save_radiomics: feat_4d = np.concatenate(feat_4d, axis=0)
         if beta_params is not None:
             prob_3d = np.concatenate(prob_3d, axis=0)
             image_4d = np.stack(image_4d, axis=0)
@@ -182,6 +196,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
                 z_spacing = voxel_spacing.pop(slice_axis)
                 voxel_spacing.insert(0, z_spacing)
             mask_3d = remove_inconsistent_objects(mask_3d, spacing=voxel_spacing)
+        if save_radiomics: radiomic_feat = feat_4d[mask_3d > 0]
         final_mask = np.moveaxis(mask_3d, 0, slice_axis)
         
         if isinstance(img_path, list):
@@ -192,6 +207,10 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
         print(f"Saving predicted segmentation to {save_mask_path}")
         nifti_img = nib.Nifti1Image(final_mask, affine)
         nib.save(nifti_img, save_mask_path)
+        if save_radiomics:
+            save_feat_path = f"{save_dir}/{img_name}.npy"
+            print(f"Saving radiomic features to {save_feat_path}")
+            np.save(save_feat_path, radiomic_feat)
     return
 
 def load_beta_params(modality, site, target):
@@ -321,5 +340,6 @@ if __name__ == "__main__":
             meta_list=meta_list,
             img_format=args.format,
             beta_params=None,
-            prompt_ensemble=True
+            prompt_ensemble=True,
+            save_radiomics=True
         )

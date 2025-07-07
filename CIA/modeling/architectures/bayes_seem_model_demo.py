@@ -372,7 +372,7 @@ class BayesianSEEM(nn.Module):
             extra['audio_class'] = gtext['class_emb']
         
         outputs = self.sem_seg_head.predictor(multi_scale_features, mask_features, target_queries=queries_grounding, extra=extra, task='demo')
-        extra['deep_feature'] = mask_features
+        extra['deep_feature'] = decomp_outputs['deep_feature']
         return outputs, images.tensor.shape, extra
 
     def evaluate(self, batched_inputs):

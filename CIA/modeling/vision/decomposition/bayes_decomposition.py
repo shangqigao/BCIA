@@ -22,6 +22,7 @@ class BayesDec(nn.Module):
         self.phi_rho = float(cfg['MODEL']['DECOMPOSITION']['PHI_RHO'])
         self.gamma_upsilon = cfg['MODEL']['DECOMPOSITION']['GAMMA_UPSILON']
         self.phi_upsilon = float(cfg['MODEL']['DECOMPOSITION']['PHI_UPSILON'])
+        self.return_feat = cfg['MODEL']['DECOMPOSITION']['RETURN_FEATURE']
 
         self.res_shape = ResNet_shape(num_in_ch=self.in_channel, num_out_ch=2*self.in_channel)
         self.res_appear = ResNet_appearance(num_in_ch=self.in_channel, num_out_ch=2*self.in_channel, num_block=6, bn=True)
@@ -49,15 +50,24 @@ class BayesDec(nn.Module):
         m, _ = self.sample_normal_jit(mu_m, log_var_m)
         return m, mu_m, log_var_m
 
-    def generate_x(self, samples):
-        feature = self.res_shape(samples)
+    def generate_x(self, samples, return_feat):
+        if return_feat:
+            feature, deep_feat = self.res_shape(samples, return_feat=True)
+        else:
+            feature = self.res_shape(samples)
         mu_x, log_var_x = torch.chunk(feature, 2, dim=1)
         log_var_x = torch.clamp(log_var_x, -20, 0)
         x, _ = self.sample_normal_jit(mu_x, log_var_x)
+        if return_feat:
+            return x, mu_x, log_var_x, deep_feat
         return x, mu_x, log_var_x
 
     def forward(self, samples: torch.Tensor):
-        x, mu_x, log_var_x = self.generate_x(samples)
+        if self.return_feat:
+            x, mu_x, log_var_x, deep_feat = self.generate_x(samples, return_feat=True)
+        else:
+            deep_feat = None
+            x, mu_x, log_var_x = self.generate_x(samples)
         m, mu_m, log_var_m = self.generate_m(samples)
 
         residual = samples - (x + m)
@@ -116,6 +126,7 @@ class BayesDec(nn.Module):
             "rho": mu_rho_hat,
             "upsilon": mu_upsilon_hat,
             "visualize": visualize,
+            "deep_feature": deep_feat,
         }
         return out
 

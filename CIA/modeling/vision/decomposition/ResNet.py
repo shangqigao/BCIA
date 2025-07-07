@@ -152,8 +152,10 @@ class ResNet_shape(nn.Module):
         # initialization
         default_init_weights([self.conv_first, self.conv_last], 0.1)
 
-    def forward(self, x):
+    def forward(self, x, return_feat=False):
         feat = self.lrelu(self.conv_first(x))
-        out = self.body(feat)
-        out = self.conv_last(self.lrelu(out))
+        feat = self.body(feat)
+        out = self.conv_last(self.lrelu(feat))
+        if return_feat:
+            return out, feat
         return out

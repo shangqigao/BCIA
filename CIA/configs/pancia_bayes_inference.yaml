@@ -48,6 +48,7 @@ MODEL:
     PHI_UPSILON: 1e-8
     BAYES_LOSS_WEIGHT: 100
     VIS_EVERY_N_STEPS: 500
+    RETURN_FEATURE: false
   TEXT:
     ARCH: vlpencoder
     NAME: transformer
