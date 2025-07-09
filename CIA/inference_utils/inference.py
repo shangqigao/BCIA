@@ -74,11 +74,14 @@ def interactive_infer_image(model, image, prompts, resize_mask=True, return_feat
         # interpolate mask to ori size
         pred_mask_prob = F.interpolate(pred_masks_pos[None,], (data['height'], data['width']), 
                                     mode='bilinear')[0,:,:data['height'],:data['width']].sigmoid().cpu().numpy()
+        deep_feature = F.interpolate(extra['deep_feature'], (data['height'], data['width']), 
+                                    mode='bilinear')[0,:,:data['height'],:data['width']].cpu().numpy()
     else:
         pred_mask_prob = pred_masks_pos.sigmoid().cpu().numpy()
+        deep_feature = extra['deep_feature'].cpu().numpy()
     pred_masks_pos = (1*(pred_mask_prob > 0.5)).astype(np.uint8)
     if return_feature:
-        return pred_mask_prob, extra['deep_feature'].cpu().numpy()
+        return pred_mask_prob, deep_feature
     else:
         return pred_mask_prob
 

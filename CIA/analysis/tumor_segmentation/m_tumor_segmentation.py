@@ -164,7 +164,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
             for text_prompt in text_prompts:
                 if save_radiomics:
                     pred_prob, feature = interactive_infer_image(model, Image.fromarray(img), text_prompt, resize_mask=True, return_feature=True)
-                    ensemble_feat.append(feature)
+                    ensemble_feat.append(np.transpose(feature, (0, 2, 3, 1)))
                 else:
                     pred_prob = interactive_infer_image(model, Image.fromarray(img), text_prompt, resize_mask=True, return_feature=False)
                 ensemble_prob.append(pred_prob)
