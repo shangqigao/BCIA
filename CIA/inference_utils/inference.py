@@ -78,7 +78,7 @@ def interactive_infer_image(model, image, prompts, resize_mask=True, return_feat
         pred_mask_prob = pred_masks_pos.sigmoid().cpu().numpy()
     pred_masks_pos = (1*(pred_mask_prob > 0.5)).astype(np.uint8)
     if return_feature:
-        return pred_mask_prob, extra['deep_feature']
+        return pred_mask_prob, extra['deep_feature'].cpu().numpy()
     else:
         return pred_mask_prob
 
