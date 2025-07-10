@@ -91,12 +91,12 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     """
 
     # Build model config
-    opt = load_opt_from_config_files([os.path.join(relative_path, "configs/pancia_bayes_inference.yaml")])
+    opt = load_opt_from_config_files([os.path.join(relative_path, "configs/biomedparse_inference.yaml")])
     opt = init_distributed(opt)
 
     # Load model from pretrained weights
-    pretrained_pth = os.path.join(relative_path, 'checkpoints/LoRA+_multiphase_breast/model_state_dict.pt')
-    lora_pth = os.path.join(relative_path, 'checkpoints/bayes_LoRA+_sqrt')
+    pretrained_pth = os.path.join(relative_path, 'checkpoints/multiphase_pancancer.pt')
+    lora_pth = os.path.join(relative_path, 'checkpoints/bayes_LoRA_sqrt')
 
     if device == 'gpu':
         if not opt.get('LoRA', False):
@@ -164,7 +164,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
             for text_prompt in text_prompts:
                 if save_radiomics:
                     pred_prob, feature = interactive_infer_image(model, Image.fromarray(img), text_prompt, resize_mask=True, return_feature=True)
-                    ensemble_feat.append(np.transpose(feature, (0, 2, 3, 1)))
+                    ensemble_feat.append(np.transpose(feature, (1, 2, 0)))
                 else:
                     pred_prob = interactive_infer_image(model, Image.fromarray(img), text_prompt, resize_mask=True, return_feature=False)
                 ensemble_prob.append(pred_prob)
@@ -176,7 +176,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
             mask_3d.append(pred_mask)
 
             if save_radiomics: 
-                slice_feat = np.mean(np.concatenate(ensemble_feat, axis=0), axis=0, keepdims=True)
+                slice_feat = np.mean(np.stack(ensemble_feat, axis=0), axis=0, keepdims=True)
                 feat_4d.append(slice_feat)
         
         # post-processing predicted masks
@@ -202,7 +202,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
         if isinstance(img_path, list):
             img_name = pathlib.Path(img_path[0]).name.replace("_0000.nii.gz", "")
         else:
-            img_name = pathlib.Path(img_path).name.replace(".nii.gz", "")
+            img_name = pathlib.Path(img_path).name.replace("_0001.nii.gz", "")
         save_mask_path = f"{save_dir}/{img_name}.nii.gz"
         print(f"Saving predicted segmentation to {save_mask_path}")
         nifti_img = nib.Nifti1Image(final_mask, affine)
@@ -265,7 +265,7 @@ if __name__ == "__main__":
     parser.add_argument('--img_dir', default="/home/s/sg2162/projects/TCIA_NIFTI/image")
     parser.add_argument('--beta_params', default="/home/s/sg2162/projects/TCIA_NIFTI/image")
     parser.add_argument('--modality', default="MRI", choices=["CT", "MRI"], type=str)
-    parser.add_argument('--phase', default="multiphase", choices=["single", "multiple"], type=str)
+    parser.add_argument('--phase', default="multiple", choices=["single", "multiple"], type=str)
     parser.add_argument('--format', default="nifti", choices=["dicom", "nifti"], type=str)
     parser.add_argument('--site', default="breast", type=str)
     parser.add_argument('--target', default="tumor", type=str)
@@ -341,5 +341,5 @@ if __name__ == "__main__":
             img_format=args.format,
             beta_params=None,
             prompt_ensemble=True,
-            save_radiomics=True
+            save_radiomics=False
         )
