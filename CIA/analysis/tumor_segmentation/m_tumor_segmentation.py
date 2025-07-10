@@ -95,17 +95,16 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     opt = init_distributed(opt)
 
     # Load model from pretrained weights
-    pretrained_pth = os.path.join(relative_path, 'checkpoints/multiphase_pancancer.pt')
-    lora_pth = os.path.join(relative_path, 'checkpoints/bayes_LoRA_sqrt')
+    pretrained_pth = os.path.join(relative_path, 'checkpoints/singlephase_breastcancer.pt')
 
     if device == 'gpu':
         if not opt.get('LoRA', False):
             model = BaseModel(opt, build_model(opt)).from_pretrained(pretrained_pth).eval().cuda()
         else:
-            with open(f'{lora_pth}/adapter_config.json', 'r') as f:
+            with open(f'{pretrained_pth}/adapter_config.json', 'r') as f:
                 config = json.load(f)
             model = get_peft_model(BaseModel(opt, build_model(opt)), LoraConfig(**config)).cuda()
-            ckpt = torch.load(os.path.join(lora_pth, 'module_training_states.pt'))['module']
+            ckpt = torch.load(os.path.join(pretrained_pth, 'module_training_states.pt'))['module']
             ckpt = {key.replace('module.',''): ckpt[key] for key in ckpt.keys() if 'criterion' not in key}
             model.load_state_dict(ckpt)
             model = model.model.eval()
@@ -265,7 +264,7 @@ if __name__ == "__main__":
     parser.add_argument('--img_dir', default="/home/s/sg2162/projects/TCIA_NIFTI/image")
     parser.add_argument('--beta_params', default="/home/s/sg2162/projects/TCIA_NIFTI/image")
     parser.add_argument('--modality', default="MRI", choices=["CT", "MRI"], type=str)
-    parser.add_argument('--phase', default="multiple", choices=["single", "multiple"], type=str)
+    parser.add_argument('--phase', default="single", choices=["single", "multiple"], type=str)
     parser.add_argument('--format', default="nifti", choices=["dicom", "nifti"], type=str)
     parser.add_argument('--site', default="breast", type=str)
     parser.add_argument('--target', default="tumor", type=str)
