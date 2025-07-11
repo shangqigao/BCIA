@@ -76,7 +76,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
                                   format='nifti', is_CT=True, site=None, 
                                   meta_list=None, beta_params=None, 
                                   prompt_ensemble=False, save_radiomics=False,
-                                  device="gpu"):
+                                  zoom_in=False, device="gpu"):
     """extracting radiomic features slice by slice in a size of (1024, 1024)
         img_paths: a list of paths for single-phase images
             or a list of lists, where each list has paths of multi-phase images.
@@ -172,6 +172,38 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
                 image_4d.append(img)
                 prob_3d.append(pred_prob)
             pred_mask = (1*(pred_prob > 0.5)).astype(np.uint8)
+
+            if zoom_in:
+                # Find coordinates where mask == 1
+                ys, xs = np.where(np.squeeze(pred_mask) == 1)
+                min_size = 64
+                if len(xs) > 0 and len(ys) > 0:
+                    x_min, x_max = np.min(xs), np.max(xs)
+                    y_min, y_max = np.min(ys), np.max(ys)
+                    H, W = img.shape[:2]
+
+                    # Current width and height
+                    box_w = x_max - x_min + 1
+                    box_h = y_max - y_min + 1
+
+                    # How much to expand
+                    pad_w = max(0, min_size - box_w)
+                    pad_h = max(0, min_size - box_h)
+
+                    # Pad equally on both sides
+                    x_min = max(0, x_min - pad_w // 2)
+                    x_max = min(W - 1, x_max + (pad_w - pad_w // 2))
+                    y_min = max(0, y_min - pad_h // 2)
+                    y_max = min(H - 1, y_max + (pad_h - pad_h // 2))
+                    zoom_img = img[y_min:y_max+1, x_min:x_max+1]
+
+                    ensemble_prob = []
+                    for text_prompt in text_prompts:
+                        pred_prob = interactive_infer_image(model, Image.fromarray(zoom_img), text_prompt, resize_mask=True, return_feature=False)
+                        ensemble_prob.append(pred_prob)
+                    zoom_pred_prob = np.max(np.concatenate(ensemble_prob, axis=0), axis=0, keepdims=True)
+                    zoom_pred_mask = (1*(zoom_pred_prob > 0.5)).astype(np.uint8)
+                    pred_mask[:, y_min:y_max+1, x_min:x_max+1] = zoom_pred_mask
             mask_3d.append(pred_mask)
 
             if save_radiomics: 
