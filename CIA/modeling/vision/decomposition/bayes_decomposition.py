@@ -67,7 +67,7 @@ class BayesDec(nn.Module):
             x, mu_x, log_var_x, deep_feat = self.generate_x(samples, return_feat=True)
         else:
             deep_feat = None
-            x, mu_x, log_var_x = self.generate_x(samples)
+            x, mu_x, log_var_x = self.generate_x(samples, return_feat=False)
         m, mu_m, log_var_m = self.generate_m(samples)
 
         residual = samples - (x + m)

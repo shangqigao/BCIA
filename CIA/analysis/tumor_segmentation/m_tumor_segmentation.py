@@ -95,7 +95,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     opt = init_distributed(opt)
 
     # Load model from pretrained weights
-    pretrained_pth = os.path.join(relative_path, 'checkpoints/singlephase_breastcancer.pt')
+    pretrained_pth = os.path.join(relative_path, 'checkpoints/MP_LoRA_sqrt')
 
     if device == 'gpu':
         if not opt.get('LoRA', False):
@@ -264,7 +264,7 @@ if __name__ == "__main__":
     parser.add_argument('--img_dir', default="/home/s/sg2162/projects/TCIA_NIFTI/image")
     parser.add_argument('--beta_params', default="/home/s/sg2162/projects/TCIA_NIFTI/image")
     parser.add_argument('--modality', default="MRI", choices=["CT", "MRI"], type=str)
-    parser.add_argument('--phase', default="single", choices=["single", "multiple"], type=str)
+    parser.add_argument('--phase', default="multiple", choices=["single", "multiple"], type=str)
     parser.add_argument('--format', default="nifti", choices=["dicom", "nifti"], type=str)
     parser.add_argument('--site', default="breast", type=str)
     parser.add_argument('--target', default="tumor", type=str)
@@ -339,6 +339,6 @@ if __name__ == "__main__":
             meta_list=meta_list,
             img_format=args.format,
             beta_params=None,
-            prompt_ensemble=True,
+            prompt_ensemble=False,
             save_radiomics=False
         )
