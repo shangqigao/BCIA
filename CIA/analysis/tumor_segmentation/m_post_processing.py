@@ -2,7 +2,7 @@ import argparse
 import pathlib
 import nibabel as nib
 import numpy as np
-from scipy import stats
+from scipy import stats, ndimage
 from scipy.ndimage import label, zoom
 from skimage.measure import regionprops
 from inference_utils.processing_utils import get_orientation
@@ -34,8 +34,24 @@ def compute_beta_pvalue(mask_3d, image_4d, beta_params):
 
     return adj_p_value
 
+def keep_largest_components(mask, num_components=1):
+    # Label connected components
+    labeled_mask, num = ndimage.label(mask)
+    
+    if num <= num_components:
+        return mask  # Nothing to filter
 
-def remove_inconsistent_objects(mask_3d, min_slices=4, min_dice=0.2, spacing=None, new_spacing=(1.0, 1.0, 1.0),
+    # Measure size of each component
+    sizes = ndimage.sum(mask, labeled_mask, range(1, num + 1))
+    
+    # Get labels of the N largest components
+    largest_labels = np.argsort(sizes)[-num_components:] + 1  # +1 because labels start at 1
+
+    # Create a new mask keeping only largest N components
+    output_mask = np.isin(labeled_mask, largest_labels).astype(np.uint8)
+    return output_mask
+
+def remove_inconsistent_objects(mask_3d, min_slices=4, min_dice=0.0, spacing=None, new_spacing=(1.0, 1.0, 1.0),
                                 prob_3d=None, image_4d=None, beta_params=None, alpha=0.05):
     """
     Remove 3D objects that are not consistent across slices.
@@ -96,6 +112,7 @@ def remove_inconsistent_objects(mask_3d, min_slices=4, min_dice=0.2, spacing=Non
             cleaned[component] = 1
 
     print(f"Removed {num_objects} of {num} objects with spatial inconsistency!")
+    cleaned = keep_largest_components(cleaned)
     # resample to orginal shape
     if spacing is not None:
         zoom_factors = tuple(os/ns for os, ns in zip(original_shape, new_shape))

@@ -42,7 +42,8 @@ def extract_radiology_segmentation(
         img_format='nifti',
         beta_params=None,
         prompt_ensemble=False,
-        save_radiomics=False
+        save_radiomics=False,
+        zoom_in=False
     ):
     """extract segmentation from radiology images
     Args:
@@ -66,7 +67,8 @@ def extract_radiology_segmentation(
             meta_list=meta_list,
             beta_params=beta_params,
             prompt_ensemble=prompt_ensemble,
-            save_radiomics=save_radiomics
+            save_radiomics=save_radiomics,
+            zoom_in=zoom_in
         )
     else:
         raise ValueError(f"Invalid model mode: {model_mode}")
@@ -152,7 +154,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
                     pixel_spacing = [spacing[i] for i in pixel_index]
                     meta_data['pixel_spacing'] = pixel_spacing
                 text_prompts = create_prompts(meta_data)
-                text_prompts = [text_prompts[9]]
+                text_prompts = [text_prompts[2], text_prompts[9]]
             else:
                 text_prompts = [text_prompt]
             # print(f"Segmenting slice [{i+1}/{len(images)}] ...")
@@ -176,7 +178,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
             if zoom_in:
                 # Find coordinates where mask == 1
                 ys, xs = np.where(np.squeeze(pred_mask) == 1)
-                min_size = 64
+                min_size = 256
                 if len(xs) > 0 and len(ys) > 0:
                     x_min, x_max = np.min(xs), np.max(xs)
                     y_min, y_max = np.min(ys), np.max(ys)
@@ -199,9 +201,10 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
 
                     ensemble_prob = []
                     for text_prompt in text_prompts:
-                        pred_prob = interactive_infer_image(model, Image.fromarray(zoom_img), text_prompt, resize_mask=True, return_feature=False)
-                        ensemble_prob.append(pred_prob)
+                        zoom_pred_prob = interactive_infer_image(model, Image.fromarray(zoom_img), text_prompt, resize_mask=True, return_feature=False)
+                        ensemble_prob.append(zoom_pred_prob)
                     zoom_pred_prob = np.max(np.concatenate(ensemble_prob, axis=0), axis=0, keepdims=True)
+                    zoom_pred_prob = np.maximum(pred_prob[:, y_min:y_max+1, x_min:x_max+1], zoom_pred_prob)
                     zoom_pred_mask = (1*(zoom_pred_prob > 0.5)).astype(np.uint8)
                     pred_mask[:, y_min:y_max+1, x_min:x_max+1] = zoom_pred_mask
             mask_3d.append(pred_mask)
@@ -371,6 +374,7 @@ if __name__ == "__main__":
             meta_list=meta_list,
             img_format=args.format,
             beta_params=None,
-            prompt_ensemble=False,
-            save_radiomics=False
+            prompt_ensemble=True,
+            save_radiomics=False,
+            zoom_in=False
         )
