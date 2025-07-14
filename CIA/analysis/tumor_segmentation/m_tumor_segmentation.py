@@ -97,7 +97,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     opt = init_distributed(opt)
 
     # Load model from pretrained weights
-    pretrained_pth = os.path.join(relative_path, 'checkpoints/MP_LoRA_sqrt')
+    pretrained_pth = os.path.join(relative_path, 'checkpoints/MP_LoRA')
 
     if device == 'gpu':
         if not opt.get('LoRA', False):
@@ -116,7 +116,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     with torch.no_grad():
         model.model.sem_seg_head.predictor.lang_encoder.get_text_embeddings(BIOMED_CLASSES + ["background"], is_eval=True)
     
-    for idx, (img_path, text_prompt) in enumerate(zip(img_paths, text_prompts)):
+    for idx, (img_path, target_name) in enumerate(zip(img_paths, text_prompts)):
         # read slices from dicom or nifti
         if format == 'dicom':
             dicom_dir = pathlib.Path(img_path)
@@ -145,7 +145,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
                 meta_data['slice_index'] = f'{i:03}'
                 meta_data['modality'] = 'CT' if is_CT else 'MRI'
                 meta_data['site'] = site
-                meta_data['target'] = text_prompt
+                meta_data['target'] = target_name
                 if len(spacing) == 2:
                     meta_data['pixel_spacing'] = spacing
                 else:
@@ -156,7 +156,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
                 text_prompts = create_prompts(meta_data)
                 text_prompts = [text_prompts[2], text_prompts[9]]
             else:
-                text_prompts = [text_prompt]
+                text_prompts = [target_name]
             # print(f"Segmenting slice [{i+1}/{len(images)}] ...")
 
             # resize_mask=False would keep mask size to be (1024, 1024)
@@ -263,13 +263,21 @@ def create_prompts(meta_data):
     modality = meta_data['modality']
     site = meta_data['site']
     target_name = meta_data['target']
-    target = 'tumor' if 'tumor' in target_name else target_name
+    # target = 'tumor' if 'tumor' in target_name else target_name
+    target = "tumor located within fibroglandular tissue of the breast"
 
+    # basic_prompts = [
+    #     f"{target_name} in {site} {modality}",
+    #     f"{view} slice {slice_index} showing {target} in {site}",
+    #     f"{target} located in the {site} on {modality}",
+    #     f"{view} {site} {modality} with {target}",
+    #     f"{target} visible in slice {slice_index} of {modality}",
+    # ]
     basic_prompts = [
         f"{target_name} in {site} {modality}",
-        f"{view} slice {slice_index} showing {target} in {site}",
-        f"{target} located in the {site} on {modality}",
-        f"{view} {site} {modality} with {target}",
+        f"{view} slice {slice_index} showing {target}",
+        f"{target} on {modality}",
+        f"{view} {modality} with {target}",
         f"{target} visible in slice {slice_index} of {modality}",
     ]
 
@@ -327,8 +335,8 @@ if __name__ == "__main__":
                 multiphase_keys = ["_0000.nii.gz", "_0001.nii.gz", "_0002.nii.gz"]
                 nii_paths = [p for p in nii_paths if any(k in p.name for k in multiphase_keys)]
                 img_paths.append(sorted(nii_paths))
-    # text_prompts = [[f'{args.site} {args.target} in {args.site} {args.modality}']]*len(img_paths)
-    text_prompts = [[f'{args.site} {args.target}']]*len(img_paths)
+    # text_prompts = [f'{args.site} {args.target} in {args.site} {args.modality}']*len(img_paths)
+    text_prompts = [f'{args.site} {args.target}']*len(img_paths)
     save_dir = pathlib.Path(args.save_dir)
 
     # read clinical and imaging info
