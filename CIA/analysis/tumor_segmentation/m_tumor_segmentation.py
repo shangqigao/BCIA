@@ -97,7 +97,7 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
     opt = init_distributed(opt)
 
     # Load model from pretrained weights
-    pretrained_pth = os.path.join(relative_path, 'checkpoints/MP_LoRA')
+    pretrained_pth = os.path.join(relative_path, 'checkpoints/MP_heart_LoRA_sqrt')
 
     if device == 'gpu':
         if not opt.get('LoRA', False):
