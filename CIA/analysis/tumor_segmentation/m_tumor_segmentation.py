@@ -133,13 +133,13 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
         image_4d = []
         prob_3d = []
         feat_4d = []
+        meta_data = {} if meta_list is None else meta_list[idx]
         for i, element in enumerate(images):
             assert len(element) == 3
             img, spacing, phase = element
 
             # use prompt ensemble
             if prompt_ensemble:
-                meta_data = {} if meta_list is None else meta_list[idx]
                 assert isinstance(meta_data, dict)
                 meta_data['view'] = phase
                 meta_data['slice_index'] = f'{i:03}'
@@ -215,6 +215,21 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
         
         # post-processing predicted masks
         mask_3d = np.concatenate(mask_3d, axis=0)
+
+        # crop by breast mask if available
+        if meta_data.get("breast_coordinates", False):
+            coords = meta_data["breast_coordinates"]
+            x_min, x_max = coords["x_min"], coords["x_max"]
+            y_min, y_max = coords["y_min"], coords["y_max"]
+            z_min, z_max = coords["z_min"], coords["z_max"]
+
+            mask_nib = np.moveaxis(mask_3d, 0, slice_axis) # to nib array
+            mask_sitk = np.transpose(mask_nib, (2, 1, 0)) # to sitk array
+            mask_new = np.zeros_like(mask_sitk)
+            mask_new[x_min:x_max, y_min:y_max, z_min:z_max] = mask_sitk[x_min:x_max, y_min:y_max, z_min:z_max] 
+            mask_nib = np.transpose(mask_new, (2, 1, 0)) # to nib array
+            mask_3d = np.moveaxis(mask_nib, slice_axis, 0)
+
         if save_radiomics: feat_4d = np.concatenate(feat_4d, axis=0)
         if beta_params is not None:
             prob_3d = np.concatenate(prob_3d, axis=0)
