@@ -33,7 +33,7 @@ class BayesDec(nn.Module):
         Dx[:, :, 1, 0] = Dx[:, :, 1, 2] = Dx[:, :, 0, 1] = Dx[:, :, 2, 1] = -1 / 4
         # repeat for multi-channel image
         Dx_grouped = Dx.repeat(self.in_channel, 1, 1, 1)
-        self.Dx = nn.Parameter(data=Dx_grouped, requires_grad=False)
+        self.register_buffer('Dx', Dx_grouped)
 
 
     @staticmethod
