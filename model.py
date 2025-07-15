@@ -200,8 +200,10 @@ class Model:
             images = self.dataset.get_dce_mri_path_list(patient_id)
             multiphase_images.append(images[:3])
             patient_info = self.dataset.read_json_file(patient_id)
+            meta_data = patient_info["imaging_data"]
             coords = patient_info["primary_lesion"]["breast_coordinates"]
-            meta_list.append(patient_info["imaging_data"].update({"breast_coordinates": coords}))
+            meta_data.update({"breast_coordinates": coords})
+            meta_list.append(meta_data)
         text_prompts = [f"{self.site} {self.target}"]*len(multiphase_images)
         # beta_params = load_beta_params(self.modality, self.site, self.target)
         # === Output folder for raw nnUNet segmentations ===

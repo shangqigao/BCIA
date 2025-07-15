@@ -133,15 +133,13 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
         image_4d = []
         prob_3d = []
         feat_4d = []
-        meta_data = {}
+        meta_data = {} if meta_list is None else meta_list[idx]
         for i, element in enumerate(images):
             assert len(element) == 3
             img, spacing, phase = element
 
             # use prompt ensemble
             if prompt_ensemble:
-                if meta_list is not None: meta_data = meta_list[idx]
-                print(meta_data)
                 assert isinstance(meta_data, dict)
                 meta_data['view'] = phase
                 meta_data['slice_index'] = f'{i:03}'
