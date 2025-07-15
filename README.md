@@ -4,7 +4,7 @@ This repository provides source code of participating the MAMA-MIA 2025 challeng
 
 ### For challenge organizers
 
-All required dependencies have been included in `requirements.txt`. This code has been sucessfully tested at sanity-check phase and validation phase on Codabench. Our code particularly depends on detectron2, and we have compiled a wheel (`detectron2-0.6-cp310-cp310-linux_x86_64.whl`) based on the provided python environment by the organizers. 
+All required dependencies have been included in `requirements.txt`. This code has been sucessfully tested at sanity-check phase and validation phase on Codabench. Our code particularly depends on detectron2 which is failed to be directly installed in the organizers' docker environment by `pip install detectron2`, so we have compiled a wheel (`detectron2-0.6-cp310-cp310-linux_x86_64.whl`) based on the provided python environment by the organizers. The changing of their docker environment may make this code be failed to run.
 
 ### Installation
 
