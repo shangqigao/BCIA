@@ -90,16 +90,22 @@ def process_intensity_3Dimage(image_data, is_CT, site=None, keep_size=True):
         lower_bound, upper_bound = window
     else:
         # process image with intensity range 0.5-99.5 percentile
-        lower_bound, upper_bound = np.percentile(
-            image_data[image_data > 0], 0.5
-        ), np.percentile(image_data[image_data > 0], 99.5)
-        
-    image_data_pre = np.clip(image_data, lower_bound, upper_bound)
-    image_data_pre = (
-        (image_data_pre - image_data_pre.min())
-        / (image_data_pre.max() - image_data_pre.min())
-        * 255.0
-    )
+        if image_data.max() > 0:
+            lower_bound, upper_bound = np.percentile(
+                image_data[image_data > 0], 0.5
+            ), np.percentile(image_data[image_data > 0], 99.5)
+        else:
+            lower_bound, upper_bound = 0, 0
+
+    if lower_bound == 0 and upper_bound == 0:
+        image_data_pre = np.zeros_like(image_data)  
+    else:
+        image_data_pre = np.clip(image_data, lower_bound, upper_bound)
+        image_data_pre = (
+            (image_data_pre - image_data_pre.min())
+            / (image_data_pre.max() - image_data_pre.min())
+            * 255.0
+        )
     
     if keep_size:
         resize_image = image_data_pre
@@ -272,7 +278,6 @@ def read_nifti_inplane(image_path, is_CT, site=None, keep_size=False, return_spa
                 slice_img = image_array[:, :, i]
             else:
                 raise ValueError(f"Slice axis is {slice_axis}, maximum shoud be 2")
-            
             if multiphase:
                 slice_img = process_intensity_3Dimage(slice_img, is_CT, site, keep_size)
             else:
