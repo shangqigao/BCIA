@@ -245,8 +245,10 @@ def extract_BiomedParse_segmentation(img_paths, text_prompts, save_dir,
                 z_spacing = voxel_spacing.pop(slice_axis)
                 voxel_spacing.insert(0, z_spacing)
             mask_3d = remove_inconsistent_objects(mask_3d, spacing=voxel_spacing)
-        if save_radiomics: radiomic_feat = feat_4d[mask_3d > 0]
         final_mask = np.moveaxis(mask_3d, 0, slice_axis)
+        if save_radiomics: 
+            radiomic_feat = np.moveaxis(feat_4d, 0, slice_axis)
+            radiomic_feat = radiomic_feat[final_mask > 0]
         
         if isinstance(img_path, list):
             img_name = pathlib.Path(img_path[0]).name.replace("_0000.nii.gz", "")
@@ -398,6 +400,6 @@ if __name__ == "__main__":
             img_format=args.format,
             beta_params=None,
             prompt_ensemble=True,
-            save_radiomics=False,
+            save_radiomics=True,
             zoom_in=False
         )
