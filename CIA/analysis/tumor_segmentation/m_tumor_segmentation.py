@@ -360,6 +360,7 @@ if __name__ == "__main__":
     if args.meta_info is not None:
         df_meta = pd.read_excel(args.meta_info, sheet_name='dataset_info')
         df_meta['pixel_spacing'] = df_meta['pixel_spacing'].apply(ast.literal_eval)
+        parent_path = pathlib.Path(args.meta_info).parent
         meta_list = []
         for patient_id in patient_ids:
             field_strength = df_meta.loc[df_meta["patient_id"] == patient_id, 'field_strength'].values[0]
@@ -371,6 +372,11 @@ if __name__ == "__main__":
                 'bilateral': lateral, 
                 'scanner_manufacturer': manufacturer
             }
+            patient_info_path = f'{parent_path}/patient_info_files/{patient_id}.json'
+            with open(patient_info_path, 'r') as file: 
+                patient_info = json.load(file)
+            breast_coords = patient_info["primary_lesion"]["breast_coordinates"]
+            meta_data.update({"breast_coordinates": breast_coords})
             meta_list.append(meta_data)
     else:
         meta_list = None
