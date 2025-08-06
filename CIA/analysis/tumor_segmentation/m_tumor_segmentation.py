@@ -400,6 +400,6 @@ if __name__ == "__main__":
             img_format=args.format,
             beta_params=None,
             prompt_ensemble=True,
-            save_radiomics=True,
+            save_radiomics=False,
             zoom_in=False
         )
